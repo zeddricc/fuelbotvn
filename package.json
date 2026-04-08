@@ -1,0 +1,28 @@
+{
+  "name": "gasbot",
+  "version": "1.0.0",
+  "description": "Telegram bot for daily Vietnam gasoline price updates",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "dev": "ts-node src/index.ts",
+    "dev:watch": "nodemon --exec ts-node src/index.ts --ext ts"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.102.1",
+    "dotenv": "^16.4.5",
+    "express": "^5.2.1",
+    "node-cron": "^3.0.3",
+    "node-telegram-bot-api": "^0.66.0"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.6",
+    "@types/node": "^20.14.0",
+    "@types/node-cron": "^3.0.11",
+    "@types/node-telegram-bot-api": "^0.64.7",
+    "nodemon": "^3.1.4",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.4.5"
+  }
+}
