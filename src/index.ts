@@ -60,10 +60,15 @@ process.on('uncaughtException', (err) => {
 // ─── Register features ────────────────────────────────────────────────────────
 
 registerCommands(bot);
-startDailyJob(bot, CHAT_ID, CRON_SCHEDULE);
+
+// Gửi lúc 07:00 sáng (Bản tin đầu ngày)
+startDailyJob(bot, CHAT_ID, CRON_SCHEDULE || '0 7 * * *');
+
+// Gửi lúc 15:30 chiều (Thời điểm thường có điều chỉnh giá)
+startDailyJob(bot, CHAT_ID, '30 15 * * *');
 
 console.log('[init] GasBot is running. Press Ctrl+C to stop.');
-console.log(`[init] Daily digest will be sent to chat: ${CHAT_ID}`);
+console.log(`[init] Daily schedules: 07:00 and 15:30 (Asia/Ho_Chi_Minh)`);
 
 // ─── Health Check Server (For Deployment like Render) ─────────────────────────
 import express, { Request, Response } from 'express';
