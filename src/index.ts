@@ -93,8 +93,10 @@ app.get('/trigger-broadcast', async (req: Request, res: Response) => {
       await bot.sendMessage(CHAT_ID, digest, { parse_mode: 'HTML' });
       return res.send('Broadcast sent successfully!');
     }
+    console.error('[trigger] todayData is null');
     res.status(500).send('Failed to fetch data');
   } catch (err) {
+    console.error('[trigger] Error during broadcast:', err);
     res.status(500).send('Error triggering broadcast');
   }
 });
