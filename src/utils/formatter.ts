@@ -36,7 +36,7 @@ export function buildTodayMessage(data: TodayPrices): string {
   }
 
 
-  lines.push(`ℹ️ <i>Nguồn: giaxanghomnay.com</i>`);
+
 
   return lines.join('\n');
 }
@@ -79,28 +79,24 @@ export function buildAlertMessage(result: AlertResult): string {
     }
   }
 
-  lines.push(`ℹ️ <i>Nguồn: giaxanghomnay.com</i>`);
+
 
   return lines.join('\n');
 }
 
 // ─── Daily Digest (cron job) ──────────────────────────────────────────────────
 
-/**
- * Combines the today prices message and any alerts into a single
- * daily digest message for the cron job broadcast.
- */
-export function buildDailyDigest(today: TodayPrices, alertResult: AlertResult): string {
-  const parts: string[] = [];
+import { format } from 'date-fns';
 
-  parts.push(buildTodayMessage(today));
-
-  if (alertResult.alerts.length > 0) {
-    parts.push('─'.repeat(30));
-    parts.push(buildAlertMessage(alertResult));
-  }
-
-  return parts.join('\n\n');
+/** Builds the simplified daily message for broadcast */
+export function buildDailyDigest(today: TodayPrices): string {
+  const dateStr = format(new Date(), 'dd/MM/yyyy');
+  let text = buildTodayMessage(today);
+  
+  // Chỉnh sửa tiêu đề để thêm thông tin cập nhật
+  text = text.replace(`📅 <b>${dateStr}</b>`, `📅 <b>${dateStr}</b> (Cập nhật lúc 15:30)`);
+  
+  return text;
 }
 
 // ─── Error message ────────────────────────────────────────────────────────────

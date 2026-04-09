@@ -47,24 +47,15 @@ export function startDailyJob(
       console.log(`[scheduler] Running daily price broadcast at ${new Date().toISOString()}`);
 
       try {
-        // Run both fetches concurrently – today + 10-day history
-        const [todayData, alertResult] = await Promise.all([
-          fetchTodayPrices(),
-          detect10DayFluctuations(),
-        ]);
-
-        if (!todayData) {
-          // API completely unreachable – send a friendly error instead of crashing
+        const todayData = await fetchTodayPrices();
+        if (todayData) {
+          const digest = buildDailyDigest(todayData);
+          await bot.sendMessage(chatId, digest, { parse_mode: 'HTML' });
+        } else {
           await bot.sendMessage(chatId, buildErrorMessage('cron daily job'), {
             parse_mode: 'HTML',
           });
-          return;
         }
-
-        const digest = buildDailyDigest(todayData, alertResult);
-        await bot.sendMessage(chatId, digest, { parse_mode: 'HTML' });
-
-        console.log('[scheduler] Daily digest sent successfully.');
       } catch (err) {
         // Surface unexpected errors to the log but don't let the process die
         console.error('[scheduler] Unexpected error during daily job:', err);

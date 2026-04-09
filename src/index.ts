@@ -61,14 +61,11 @@ process.on('uncaughtException', (err) => {
 
 registerCommands(bot);
 
-// Gửi lúc 07:00 sáng (Bản tin đầu ngày)
-startDailyJob(bot, CHAT_ID, CRON_SCHEDULE || '0 7 * * *');
-
-// Gửi lúc 15:30 chiều (Thời điểm thường có điều chỉnh giá)
+// Gửi lúc 15:30 chiều (Thời điểm cập nhật giá chính thức)
 startDailyJob(bot, CHAT_ID, '30 15 * * *');
 
 console.log('[init] GasBot is running. Press Ctrl+C to stop.');
-console.log(`[init] Daily schedules: 07:00 and 15:30 (Asia/Ho_Chi_Minh)`);
+console.log(`[init] Daily schedule: 15:30 (Asia/Ho_Chi_Minh)`);
 
 // ─── Health Check Server (For Deployment like Render) ─────────────────────────
 import express, { Request, Response } from 'express';
@@ -84,12 +81,9 @@ import { buildDailyDigest } from './utils/formatter';
 
 app.get('/trigger-broadcast', async (req: Request, res: Response) => {
   try {
-    const [todayData, alertResult] = await Promise.all([
-      fetchTodayPrices(),
-      detect10DayFluctuations(),
-    ]);
+    const todayData = await fetchTodayPrices();
     if (todayData) {
-      const digest = buildDailyDigest(todayData, alertResult);
+      const digest = buildDailyDigest(todayData);
       await bot.sendMessage(CHAT_ID, digest, { parse_mode: 'HTML' });
       return res.send('Broadcast sent successfully!');
     }

@@ -75,8 +75,8 @@ async function calculateAndSendResult(
     `Phương tiện: <b>${label}</b>\n` +
     `Dung tích: <b>${capacity}L</b>\n` +
     `Giá <b>RON 95-III</b>: <b>${formatPrice(price)} đ/L</b>\n\n` +
-    `💴 Tổng cộng: <b>~${formatPrice(total)} VNĐ</b>\n\n` +
-    `ℹ️ <i>Nguồn: giaxanghomnay.com</i>`;
+    `💴 Tổng cộng: <b>~${formatPrice(total)} VNĐ</b>\n\n`
+
 
   if (editMessageId) await bot.editMessageText(text, options as any);
   else await bot.sendMessage(chatId, text, options);
