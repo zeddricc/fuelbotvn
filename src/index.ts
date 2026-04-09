@@ -78,6 +78,27 @@ const PORT = process.env.PORT || 3000;
 app.get('/', (req: Request, res: Response) => res.send('GasBot is alive! ⛽'));
 app.get('/health', (req: Request, res: Response) => res.status(200).send('OK'));
 
+// Route để kích hoạt gửi tin nhắn từ bên ngoài
+import { fetchTodayPrices, detect10DayFluctuations } from './services/priceService';
+import { buildDailyDigest } from './utils/formatter';
+
+app.get('/trigger-broadcast', async (req: Request, res: Response) => {
+  try {
+    const [todayData, alertResult] = await Promise.all([
+      fetchTodayPrices(),
+      detect10DayFluctuations(),
+    ]);
+    if (todayData) {
+      const digest = buildDailyDigest(todayData, alertResult);
+      await bot.sendMessage(CHAT_ID, digest, { parse_mode: 'HTML' });
+      return res.send('Broadcast sent successfully!');
+    }
+    res.status(500).send('Failed to fetch data');
+  } catch (err) {
+    res.status(500).send('Error triggering broadcast');
+  }
+});
+
 app.listen(PORT, () => {
   console.log(`[health] Health check server listening on port ${PORT}`);
 });
