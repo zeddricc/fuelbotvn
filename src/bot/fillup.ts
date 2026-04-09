@@ -23,7 +23,7 @@ const TARGET_FUEL_SUBSTRING = '95-III';
 
 // ─── State Management ────────────────────────────────────────────────────────
 
-type InputState = 
+type InputState =
   | { type: 'awaiting_liters' }
   | { type: 'awaiting_bike_name' }
   | { type: 'awaiting_bike_capacity', bikeName: string };
@@ -33,9 +33,9 @@ const userStates = new Map<number, InputState>();
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 async function calculateAndSendResult(
-  bot: TelegramBot, 
-  chatId: number, 
-  label: string, 
+  bot: TelegramBot,
+  chatId: number,
+  label: string,
   capacity: number,
   editMessageId?: number
 ) {
@@ -70,9 +70,9 @@ async function calculateAndSendResult(
   const price = ron95.zone1_price;
   const total = Math.round(capacity * price);
 
-  const text = 
+  const text =
     `💰 <b>Kết Quả Tính Tiền</b>\n\n` +
-    `Đối tượng: <b>${label}</b>\n` +
+    `Phương tiện: <b>${label}</b>\n` +
     `Dung tích: <b>${capacity}L</b>\n` +
     `Giá <b>RON 95-III</b>: <b>${formatPrice(price)} đ/L</b>\n\n` +
     `💴 Tổng cộng: <b>~${formatPrice(total)} VNĐ</b>\n\n` +
@@ -87,7 +87,7 @@ async function calculateAndSendResult(
 async function buildFillupKeyboard(chatId: number): Promise<TelegramBot.InlineKeyboardMarkup> {
   const customBikes = await StorageService.getUserBikes(chatId);
   const rows: TelegramBot.InlineKeyboardButton[][] = [];
-  
+
   // Merge default and custom
   const allBikes = { ...DEFAULT_MOTORBIKES };
   customBikes.forEach(b => { allBikes[b.name] = b.capacity; });
@@ -97,8 +97,8 @@ async function buildFillupKeyboard(chatId: number): Promise<TelegramBot.InlineKe
     const row: TelegramBot.InlineKeyboardButton[] = [];
     const [n1, c1] = entries[i];
     row.push({ text: `🏍️ ${n1} (${c1}L)`, callback_data: `${CB_PREFIX}${n1}` });
-    if (entries[i+1]) {
-      const [n2, c2] = entries[i+1];
+    if (entries[i + 1]) {
+      const [n2, c2] = entries[i + 1];
       row.push({ text: `🏍️ ${n2} (${c2}L)`, callback_data: `${CB_PREFIX}${n2}` });
     }
     rows.push(row);
@@ -138,7 +138,7 @@ async function handleMessage(bot: TelegramBot, msg: TelegramBot.Message) {
     }
     userStates.delete(chatId);
     await calculateAndSendResult(bot, chatId, 'Số lít tùy chỉnh', liters);
-  } 
+  }
   else if (state.type === 'awaiting_bike_name') {
     userStates.set(chatId, { type: 'awaiting_bike_capacity', bikeName: text });
     await bot.sendMessage(chatId, `👌 Đã nhận tên xe: <b>${text}</b>\nBây giờ hãy nhập <b>dung tích bình xăng (Lít)</b>:`, { parse_mode: 'HTML' });
@@ -151,7 +151,7 @@ async function handleMessage(bot: TelegramBot, msg: TelegramBot.Message) {
     }
     await StorageService.addUserBike(chatId, { name: state.bikeName, capacity: cap });
     userStates.delete(chatId);
-    await bot.sendMessage(chatId, `✅ Đã lưu xe <b>${state.bikeName} (${cap}L)</b> thành công!`, { 
+    await bot.sendMessage(chatId, `✅ Đã lưu xe <b>${state.bikeName} (${cap}L)</b> thành công!`, {
       parse_mode: 'HTML',
       reply_markup: { inline_keyboard: [[{ text: '🔄 Tính tiền ngay', callback_data: CB_RESTART }]] }
     });
@@ -188,7 +188,7 @@ async function handleCallback(bot: TelegramBot, query: TelegramBot.CallbackQuery
     const bikeName = data.slice(CB_PREFIX.length);
     const customBikes = await StorageService.getUserBikes(chatId);
     const capacity = DEFAULT_MOTORBIKES[bikeName] || customBikes.find(b => b.name === bikeName)?.capacity;
-    
+
     if (capacity) {
       await calculateAndSendResult(bot, chatId, bikeName, capacity, query.message?.message_id);
     }
@@ -199,9 +199,9 @@ async function handleCallback(bot: TelegramBot, query: TelegramBot.CallbackQuery
 
 export function registerFillupCommand(bot: TelegramBot): void {
   bot.onText(/\/(fillup|doday)/, (msg) => handleFillupCommand(bot, msg));
-  
+
   bot.on('callback_query', (query) => handleCallback(bot, query));
-  
+
   // Main message listener for custom input states
   bot.on('message', (msg) => {
     // Avoid processing commands as input
