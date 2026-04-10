@@ -50,26 +50,30 @@ export function startDailyJob(
         const todayData = await fetchTodayPrices();
         if (todayData) {
           const digest = buildDailyDigest(todayData);
-          await bot.sendMessage(chatId, digest, { parse_mode: 'HTML' });
+          const chatIds = chatId.split(',').map(id => id.trim());
+          
+          for (const id of chatIds) {
+            try {
+              await bot.sendMessage(id, digest, { parse_mode: 'HTML' });
+            } catch (err) {
+              console.error(`[scheduler] Failed to send to ${id}:`, err);
+            }
+          }
         } else {
-          await bot.sendMessage(chatId, buildErrorMessage('cron daily job'), {
-            parse_mode: 'HTML',
-          });
+          const chatIds = chatId.split(',').map(id => id.trim());
+          for (const id of chatIds) {
+            try {
+              await bot.sendMessage(id, buildErrorMessage('cron daily job'), {
+                parse_mode: 'HTML',
+              });
+            } catch (err) {
+              console.error(`[scheduler] Failed to send error message to ${id}:`, err);
+            }
+          }
         }
       } catch (err) {
         // Surface unexpected errors to the log but don't let the process die
         console.error('[scheduler] Unexpected error during daily job:', err);
-
-        try {
-          await bot.sendMessage(
-            chatId,
-            buildErrorMessage('cron daily job – unexpected error'),
-            { parse_mode: 'HTML' }
-          );
-        } catch {
-          // If even the error message can't be sent, just log and move on
-          console.error('[scheduler] Could not send error message to Telegram.');
-        }
       }
     },
     {

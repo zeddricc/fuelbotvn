@@ -76,7 +76,7 @@ app.get('/', (req: Request, res: Response) => res.send('GasBot is alive! ⛽'));
 app.get('/health', (req: Request, res: Response) => res.status(200).send('OK'));
 
 // Route để kích hoạt gửi tin nhắn từ bên ngoài
-import { fetchTodayPrices, detect10DayFluctuations } from './services/priceService';
+import { fetchTodayPrices } from './services/priceService';
 import { buildDailyDigest } from './utils/formatter';
 
 app.get('/trigger-broadcast', async (req: Request, res: Response) => {
@@ -84,10 +84,16 @@ app.get('/trigger-broadcast', async (req: Request, res: Response) => {
     const todayData = await fetchTodayPrices();
     if (todayData) {
       const digest = buildDailyDigest(todayData);
-      await bot.sendMessage(CHAT_ID, digest, { parse_mode: 'HTML' });
-      return res.send('Broadcast sent successfully!');
+      const chatIds = CHAT_ID.split(',').map(id => id.trim());
+      
+      const sendPromises = chatIds.map(id => 
+        bot.sendMessage(id, digest, { parse_mode: 'HTML' })
+          .catch(err => console.error(`[trigger] Failed to send to ${id}:`, err.message))
+      );
+      
+      await Promise.all(sendPromises);
+      return res.send(`Broadcast sent to ${chatIds.length} chats!`);
     }
-    console.error('[trigger] todayData is null');
     res.status(500).send('Failed to fetch data');
   } catch (err) {
     console.error('[trigger] Error during broadcast:', err);
