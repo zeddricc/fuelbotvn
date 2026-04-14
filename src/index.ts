@@ -78,6 +78,7 @@ app.get('/health', (req: Request, res: Response) => res.status(200).send('OK'));
 // Route để kích hoạt gửi tin nhắn từ bên ngoài
 import { fetchTodayPrices } from './services/priceService';
 import { buildDailyDigest } from './utils/formatter';
+import { StorageService } from './services/storageService';
 
 app.get('/trigger-broadcast', async (req: Request, res: Response) => {
   try {
@@ -86,10 +87,23 @@ app.get('/trigger-broadcast', async (req: Request, res: Response) => {
       const digest = buildDailyDigest(todayData);
       const chatIds = CHAT_ID.split(',').map(id => id.trim());
       
-      const sendPromises = chatIds.map(id => 
-        bot.sendMessage(id, digest, { parse_mode: 'HTML' })
-          .catch(err => console.error(`[trigger] Failed to send to ${id}:`, err.message))
-      );
+      const sendPromises = chatIds.map(async (id) => {
+        try {
+          const lastMessageId = await StorageService.getLastMessageId(id);
+          if (lastMessageId) {
+            try {
+              await bot.deleteMessage(id, lastMessageId);
+            } catch (delErr: any) {
+              console.error(`[trigger] Failed to delete previous message ${lastMessageId} in ${id}:`, delErr.message);
+            }
+          }
+
+          const sentMessage = await bot.sendMessage(id, digest, { parse_mode: 'HTML' });
+          await StorageService.setLastMessageId(id, sentMessage.message_id);
+        } catch (err: any) {
+          console.error(`[trigger] Failed to send to ${id}:`, err.message);
+        }
+      });
       
       await Promise.all(sendPromises);
       return res.send(`Broadcast sent to ${chatIds.length} chats!`);

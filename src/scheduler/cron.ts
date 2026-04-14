@@ -5,6 +5,7 @@ import {
   detect10DayFluctuations,
 } from '../services/priceService';
 import { buildDailyDigest, buildErrorMessage } from '../utils/formatter';
+import { StorageService } from '../services/storageService';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -54,7 +55,17 @@ export function startDailyJob(
           
           for (const id of chatIds) {
             try {
-              await bot.sendMessage(id, digest, { parse_mode: 'HTML' });
+              const lastMessageId = await StorageService.getLastMessageId(id);
+              if (lastMessageId) {
+                try {
+                  await bot.deleteMessage(id, lastMessageId);
+                } catch (delErr: any) {
+                  console.error(`[scheduler] Failed to delete previous message ${lastMessageId} in ${id}:`, delErr.message);
+                }
+              }
+
+              const sentMessage = await bot.sendMessage(id, digest, { parse_mode: 'HTML' });
+              await StorageService.setLastMessageId(id, sentMessage.message_id);
             } catch (err) {
               console.error(`[scheduler] Failed to send to ${id}:`, err);
             }

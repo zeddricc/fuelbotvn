@@ -42,4 +42,40 @@ export class StorageService {
       console.error('[storage] Error saving to Supabase:', error);
     }
   }
+
+  /** Gets the last broadcast message id for a chat */
+  static async getLastMessageId(chatId: string): Promise<number | null> {
+    if (!supabaseUrl || !supabaseKey) return null;
+
+    const { data, error } = await supabase
+      .from('broadcast_messages')
+      .select('message_id')
+      .eq('chat_id', chatId)
+      .single();
+
+    if (error) {
+      if (error.code !== 'PGRST116') { // PGRST116 is "Row not found", which is fine for first time
+        console.error('[storage] Error fetching last message from Supabase:', error);
+      }
+      return null;
+    }
+    return data?.message_id || null;
+  }
+
+  /** Saves the latest broadcast message id for a chat */
+  static async setLastMessageId(chatId: string, messageId: number) {
+    if (!supabaseUrl || !supabaseKey) return;
+
+    const { error } = await supabase
+      .from('broadcast_messages')
+      .upsert({
+        chat_id: chatId,
+        message_id: messageId,
+        updated_at: new Date().toISOString()
+      }, { onConflict: 'chat_id' });
+
+    if (error) {
+      console.error('[storage] Error saving last message to Supabase:', error);
+    }
+  }
 }
