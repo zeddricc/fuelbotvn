@@ -83,7 +83,12 @@ import { StorageService } from './services/storageService';
 app.post('/trigger-broadcast', express.json(), async (req: Request, res: Response) => {
   try {
     const message = (req.body as { message: string })?.message;
-    const chatIds = CHAT_ID.split(',').map(id => id.trim());
+    const chatIdParam = req.query.chatId as string;
+
+    // Nếu có chatId param, chỉ gửi vào channel đó; ngược lại gửi tất cả
+    const chatIds = chatIdParam
+      ? [chatIdParam.trim()]
+      : CHAT_ID.split(',').map(id => id.trim());
 
     if (!message || message.trim() === '') {
       return res.status(400).json({ error: 'Missing message in body' });
