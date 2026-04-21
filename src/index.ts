@@ -80,38 +80,38 @@ import { fetchTodayPrices } from './services/priceService';
 import { buildDailyDigest } from './utils/formatter';
 import { StorageService } from './services/storageService';
 
-app.get('/trigger-broadcast', async (req: Request, res: Response) => {
+app.post('/trigger-broadcast', express.json(), async (req: Request, res: Response) => {
   try {
-    const todayData = await fetchTodayPrices();
-    if (todayData) {
-      const digest = buildDailyDigest(todayData);
-      const chatIds = CHAT_ID.split(',').map(id => id.trim());
-      
-      const sendPromises = chatIds.map(async (id) => {
-        try {
-          const lastMessageId = await StorageService.getLastMessageId(id);
-          if (lastMessageId) {
-            try {
-              await bot.deleteMessage(id, lastMessageId);
-            } catch (delErr: any) {
-              console.error(`[trigger] Failed to delete previous message ${lastMessageId} in ${id}:`, delErr.message);
-            }
-          }
+    const message = (req.body as { message: string })?.message;
+    const chatIds = CHAT_ID.split(',').map(id => id.trim());
 
-          const sentMessage = await bot.sendMessage(id, digest, { parse_mode: 'HTML' });
-          await StorageService.setLastMessageId(id, sentMessage.message_id);
-        } catch (err: any) {
-          console.error(`[trigger] Failed to send to ${id}:`, err.message);
-        }
-      });
-      
-      await Promise.all(sendPromises);
-      return res.send(`Broadcast sent to ${chatIds.length} chats!`);
+    if (!message || message.trim() === '') {
+      return res.status(400).json({ error: 'Missing message in body' });
     }
-    res.status(500).send('Failed to fetch data');
+
+    const sendPromises = chatIds.map(async (id) => {
+      try {
+        const lastMessageId = await StorageService.getLastMessageId(id);
+        if (lastMessageId) {
+          try {
+            await bot.deleteMessage(id, lastMessageId);
+          } catch (delErr: any) {
+            console.error(`[trigger] Failed to delete previous message ${lastMessageId} in ${id}:`, delErr.message);
+          }
+        }
+
+        const sentMessage = await bot.sendMessage(id, message, { parse_mode: 'HTML' });
+        await StorageService.setLastMessageId(id, sentMessage.message_id);
+      } catch (err: any) {
+        console.error(`[trigger] Failed to send to ${id}:`, err.message);
+      }
+    });
+
+    await Promise.all(sendPromises);
+    return res.json({ success: true, sentTo: chatIds.length });
   } catch (err) {
     console.error('[trigger] Error during broadcast:', err);
-    res.status(500).send('Error triggering broadcast');
+    res.status(500).json({ error: 'Error triggering broadcast' });
   }
 });
 
