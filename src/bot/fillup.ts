@@ -2,6 +2,8 @@ import TelegramBot from 'node-telegram-bot-api';
 import { fetchTodayPrices } from '../services/priceService';
 import { formatPrice } from '../utils/formatter';
 import { StorageService, UserBike } from '../services/storageService';
+import { withAuth } from '../middleware/auth';
+import { ActivityService } from '../services/activityService';
 
 // ─── Data ─────────────────────────────────────────────────────────────────────
 
@@ -116,11 +118,15 @@ async function buildFillupKeyboard(chatId: number): Promise<TelegramBot.InlineKe
 // ─── Handlers ─────────────────────────────────────────────────────────────────
 
 async function handleFillupCommand(bot: TelegramBot, msg: TelegramBot.Message) {
+  const user = (msg as any).user;
+  if (!user) return;
+
   const chatId = msg.chat.id;
   await bot.sendMessage(chatId, '🛵 <b>Tính Tiền Đổ Đầy Bình</b>\nChọn xe hoặc nhập số lít:', {
     parse_mode: 'HTML',
     reply_markup: await buildFillupKeyboard(chatId)
   });
+  await ActivityService.logCommand(user.id, 'fillup');
 }
 
 async function handleMessage(bot: TelegramBot, msg: TelegramBot.Message) {
@@ -198,7 +204,9 @@ async function handleCallback(bot: TelegramBot, query: TelegramBot.CallbackQuery
 // ─── Registration ─────────────────────────────────────────────────────────────
 
 export function registerFillupCommand(bot: TelegramBot): void {
-  bot.onText(/\/(fillup|doday)/, (msg) => handleFillupCommand(bot, msg));
+  bot.onText(/\/(fillup|doday)/, withAuth(bot, async (msg, user) => {
+    await handleFillupCommand(bot, msg);
+  }));
 
   bot.on('callback_query', (query) => handleCallback(bot, query));
 

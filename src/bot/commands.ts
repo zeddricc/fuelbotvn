@@ -9,6 +9,10 @@ import {
   buildErrorMessage,
 } from '../utils/formatter';
 import { registerFillupCommand } from './fillup';
+import { registerUserCommands } from './userCommands';
+import { registerAdminCommands } from './adminCommands';
+import { ActivityService } from '../services/activityService';
+import { withAuth } from '../middleware/auth';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -35,7 +39,7 @@ async function safeReply(
 // ─── Command Handlers ─────────────────────────────────────────────────────────
 
 function buildStartHandler(bot: TelegramBot): MessageHandler {
-  return async (msg) => {
+  return withAuth(bot, async (msg, user) => {
     const chatId = msg.chat.id;
     const firstName = msg.from?.first_name ?? 'bạn';
 
@@ -45,16 +49,20 @@ function buildStartHandler(bot: TelegramBot): MessageHandler {
       `<b>Các lệnh có sẵn:</b>\n` +
       `  /today – Giá xăng hôm nay (Vùng 1)\n` +
       `  /alert – Kiểm tra biến động giá ≥ 1.000đ trong 10 ngày qua\n` +
-      `  /fillup – Tính tiền đổ đầy bình xăng 🏍️\n\n` +
-      `⏰ Bot sẽ tự động gửi cập nhật lúc <b>07:00 sáng</b> mỗi ngày.\n\n` +
+      `  /fillup – Tính tiền đổ đầy bình xăng 🏍️\n` +
+      `  /register – Đăng ký xe mới 🏍️\n` +
+      `  /profile – Xem thông tin cá nhân 👤\n` +
+      `  /stats – Xem thống kê cá nhân 📊\n\n` +
+      `⏰ Bot sẽ tự động gửi cập nhật lúc <b>15:30</b> mỗi ngày.\n\n` +
       `ℹ️ <i>Dữ liệu từ giaxanghomnay.com</i>`;
 
     await safeReply(bot, chatId, welcomeText);
-  };
+    await ActivityService.logCommand(user.id, 'start');
+  });
 }
 
 function buildTodayHandler(bot: TelegramBot): MessageHandler {
-  return async (msg) => {
+  return withAuth(bot, async (msg, user) => {
     const chatId = msg.chat.id;
 
     // Send a "loading" indicator first for better UX
@@ -77,11 +85,12 @@ function buildTodayHandler(bot: TelegramBot): MessageHandler {
     }
 
     await safeReply(bot, chatId, buildTodayMessage(data));
-  };
+    await ActivityService.logCommand(user.id, 'today');
+  });
 }
 
 function buildAlertHandler(bot: TelegramBot): MessageHandler {
-  return async (msg) => {
+  return withAuth(bot, async (msg, user) => {
     const chatId = msg.chat.id;
 
     const loadingMsg = await bot
@@ -97,7 +106,8 @@ function buildAlertHandler(bot: TelegramBot): MessageHandler {
     }
 
     await safeReply(bot, chatId, buildAlertMessage(alertResult));
-  };
+    await ActivityService.logCommand(user.id, 'alert');
+  });
 }
 
 // ─── Registration ─────────────────────────────────────────────────────────────
@@ -114,6 +124,12 @@ export function registerCommands(bot: TelegramBot): void {
   // Register the /fillup feature (command + callback_query listener)
   registerFillupCommand(bot);
 
+  // Register user commands
+  registerUserCommands(bot);
+
+  // Register admin commands
+  registerAdminCommands(bot);
+
   // Set the command list so Telegram shows the "/" menu
   bot
     .setMyCommands([
@@ -126,6 +142,26 @@ export function registerCommands(bot: TelegramBot): void {
       {
         command: 'fillup',
         description: 'Tính tiền đổ đầy bình xăng 🏍️',
+      },
+      {
+        command: 'register',
+        description: 'Đăng ký xe mới',
+      },
+      {
+        command: 'profile',
+        description: 'Xem thông tin cá nhân',
+      },
+      {
+        command: 'stats',
+        description: 'Xem thống kê cá nhân',
+      },
+      {
+        command: 'admin_users',
+        description: 'Danh sách người dùng (admin)',
+      },
+      {
+        command: 'admin_stats',
+        description: 'Thống kê toàn bộ (admin)',
       },
     ])
     .catch((err) =>

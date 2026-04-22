@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
+import { UserService } from './userService';
 
 export interface UserBike {
   name: string;
@@ -10,14 +11,18 @@ const supabaseKey = process.env.SUPABASE_ANON_KEY || '';
 const supabase = createClient(supabaseUrl, supabaseKey);
 
 export class StorageService {
-  /** Gets all custom bikes for a specific chat from Supabase */
+  /** Gets all custom bikes for a specific user by chat ID */
   static async getUserBikes(chatId: number): Promise<UserBike[]> {
     if (!supabaseUrl || !supabaseKey) return [];
-    
+
+    // First, get or create user from chat ID
+    const user = await UserService.getUserByTelegramId(chatId);
+    if (!user) return [];
+
     const { data, error } = await supabase
       .from('user_bikes')
       .select('name, capacity')
-      .eq('chat_id', chatId.toString());
+      .eq('user_id', user.id);
 
     if (error) {
       console.error('[storage] Error fetching from Supabase:', error);
@@ -30,13 +35,17 @@ export class StorageService {
   static async addUserBike(chatId: number, bike: UserBike) {
     if (!supabaseUrl || !supabaseKey) return;
 
+    // First, get or create user from chat ID
+    const user = await UserService.getUserByTelegramId(chatId);
+    if (!user) return;
+
     const { error } = await supabase
       .from('user_bikes')
       .upsert({
-        chat_id: chatId.toString(),
+        user_id: user.id,
         name: bike.name,
         capacity: bike.capacity
-      }, { onConflict: 'chat_id,name' });
+      }, { onConflict: 'user_id,name' });
 
     if (error) {
       console.error('[storage] Error saving to Supabase:', error);
