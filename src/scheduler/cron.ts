@@ -1,9 +1,6 @@
 import cron from 'node-cron';
 import TelegramBot from 'node-telegram-bot-api';
-import {
-  fetchTodayPrices,
-  detect10DayFluctuations,
-} from '../services/priceService';
+import { fetchTodayPrices } from '../services/priceService';
 import { buildDailyDigest, buildErrorMessage } from '../utils/formatter';
 import { StorageService } from '../services/storageService';
 
@@ -19,14 +16,83 @@ import { StorageService } from '../services/storageService';
  */
 const DEFAULT_CRON_SCHEDULE = '0 7 * * *';
 
+// ─── Broadcast logic ──────────────────────────────────────────────────────────
+
+export interface BroadcastResult {
+  success: boolean;
+  sentTo: number;
+  failed: number;
+  reason?: string;
+}
+
+/**
+ * Fetches today's prices and broadcasts the digest to every chat ID in the
+ * comma-separated `chatId` string. Reused by the in-process cron and by the
+ * external HTTP trigger endpoint.
+ */
+export async function runDailyBroadcast(
+  bot: TelegramBot,
+  chatId: string,
+  source: string = 'manual'
+): Promise<BroadcastResult> {
+  console.log(`[broadcast:${source}] Running daily price broadcast at ${new Date().toISOString()}`);
+
+  const chatIds = chatId.split(',').map((id) => id.trim()).filter(Boolean);
+  let sentTo = 0;
+  let failed = 0;
+
+  try {
+    const todayData = await fetchTodayPrices();
+
+    if (!todayData) {
+      for (const id of chatIds) {
+        try {
+          await bot.sendMessage(id, buildErrorMessage(`${source} broadcast`), {
+            parse_mode: 'HTML',
+          });
+        } catch (err) {
+          console.error(`[broadcast:${source}] Failed to send error message to ${id}:`, err);
+        }
+      }
+      return { success: false, sentTo: 0, failed: chatIds.length, reason: 'no_data' };
+    }
+
+    const digest = buildDailyDigest(todayData);
+
+    for (const id of chatIds) {
+      try {
+        const lastMessageId = await StorageService.getLastMessageId(id);
+        if (lastMessageId) {
+          try {
+            await bot.deleteMessage(id, lastMessageId);
+          } catch (delErr: any) {
+            console.error(
+              `[broadcast:${source}] Failed to delete previous message ${lastMessageId} in ${id}:`,
+              delErr.message
+            );
+          }
+        }
+
+        const sentMessage = await bot.sendMessage(id, digest, { parse_mode: 'HTML' });
+        await StorageService.setLastMessageId(id, sentMessage.message_id);
+        sentTo++;
+      } catch (err) {
+        failed++;
+        console.error(`[broadcast:${source}] Failed to send to ${id}:`, err);
+      }
+    }
+
+    return { success: failed === 0, sentTo, failed };
+  } catch (err) {
+    console.error(`[broadcast:${source}] Unexpected error:`, err);
+    return { success: false, sentTo, failed: chatIds.length - sentTo, reason: 'exception' };
+  }
+}
+
 // ─── Job ──────────────────────────────────────────────────────────────────────
 
 /**
  * Starts the daily price broadcast cron job.
- *
- * @param bot      Initialised bot instance.
- * @param chatId   Target chat / channel ID to broadcast to.
- * @param schedule Optional override for the cron schedule string.
  */
 export function startDailyJob(
   bot: TelegramBot,
@@ -44,52 +110,8 @@ export function startDailyJob(
 
   cron.schedule(
     schedule,
-    async () => {
-      console.log(`[scheduler] Running daily price broadcast at ${new Date().toISOString()}`);
-
-      try {
-        const todayData = await fetchTodayPrices();
-        if (todayData) {
-          const digest = buildDailyDigest(todayData);
-          const chatIds = chatId.split(',').map(id => id.trim());
-          
-          for (const id of chatIds) {
-            try {
-              const lastMessageId = await StorageService.getLastMessageId(id);
-              if (lastMessageId) {
-                try {
-                  await bot.deleteMessage(id, lastMessageId);
-                } catch (delErr: any) {
-                  console.error(`[scheduler] Failed to delete previous message ${lastMessageId} in ${id}:`, delErr.message);
-                }
-              }
-
-              const sentMessage = await bot.sendMessage(id, digest, { parse_mode: 'HTML' });
-              await StorageService.setLastMessageId(id, sentMessage.message_id);
-            } catch (err) {
-              console.error(`[scheduler] Failed to send to ${id}:`, err);
-            }
-          }
-        } else {
-          const chatIds = chatId.split(',').map(id => id.trim());
-          for (const id of chatIds) {
-            try {
-              await bot.sendMessage(id, buildErrorMessage('cron daily job'), {
-                parse_mode: 'HTML',
-              });
-            } catch (err) {
-              console.error(`[scheduler] Failed to send error message to ${id}:`, err);
-            }
-          }
-        }
-      } catch (err) {
-        // Surface unexpected errors to the log but don't let the process die
-        console.error('[scheduler] Unexpected error during daily job:', err);
-      }
-    },
+    () => runDailyBroadcast(bot, chatId, 'cron'),
     {
-      // Use ICT timezone so the schedule is always correct regardless of
-      // what timezone the host server runs in.
       timezone: 'Asia/Ho_Chi_Minh',
     }
   );

@@ -1,7 +1,7 @@
 import 'dotenv/config';
 import TelegramBot from 'node-telegram-bot-api';
 import { registerCommands } from './bot/commands';
-import { startDailyJob } from './scheduler/cron';
+import { startDailyJob, runDailyBroadcast } from './scheduler/cron';
 
 // ─── Environment validation ───────────────────────────────────────────────────
 
@@ -22,6 +22,7 @@ const CHAT_ID = requireEnv('CHAT_ID');
 const SUPABASE_URL = requireEnv('SUPABASE_URL');
 const SUPABASE_ANON_KEY = requireEnv('SUPABASE_ANON_KEY');
 const CRON_SCHEDULE = process.env['CRON_SCHEDULE']; // optional override
+const CRON_SECRET = process.env['CRON_SECRET']; // optional shared token to protect HTTP cron
 
 // ─── Bot initialisation ───────────────────────────────────────────────────────
 
@@ -75,9 +76,21 @@ const PORT = process.env.PORT || 3000;
 app.get('/', (req: Request, res: Response) => res.send('GasBot is alive! ⛽'));
 app.get('/health', (req: Request, res: Response) => res.status(200).send('OK'));
 
-// Route để kích hoạt gửi tin nhắn từ bên ngoài
-import { fetchTodayPrices } from './services/priceService';
-import { buildDailyDigest } from './utils/formatter';
+// Endpoint cho cron-job.org (GET) — tự fetch giá xăng và broadcast tới CHAT_ID
+// Có thể bảo vệ bằng env CRON_SECRET: gọi /cron-broadcast?token=xxx
+app.get('/cron-broadcast', async (req: Request, res: Response) => {
+  if (CRON_SECRET) {
+    const token = (req.query.token as string | undefined) ?? '';
+    if (token !== CRON_SECRET) {
+      return res.status(401).json({ error: 'Invalid or missing token' });
+    }
+  }
+
+  const result = await runDailyBroadcast(bot, CHAT_ID, 'http');
+  return res.status(result.success ? 200 : 500).json(result);
+});
+
+// Route để kích hoạt gửi tin nhắn tùy chỉnh từ bên ngoài
 import { StorageService } from './services/storageService';
 
 app.post('/trigger-broadcast', express.json(), async (req: Request, res: Response) => {
